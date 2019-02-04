@@ -6,7 +6,7 @@ import numpy as np
 
 
 def train_word2vec(sentence_matrix, vocabulary_inv,
-                   num_features=300, min_word_count=1, context=10):
+                   num_features=300, min_word_count=1, context=10, pre_trained_word2vec_model=None):
     """
     Trains, saves, loads Word2Vec model
     Returns initial weights for embedding layer.
@@ -21,7 +21,10 @@ def train_word2vec(sentence_matrix, vocabulary_inv,
     model_dir = 'models'
     model_name = "{:d}features_{:d}minwords_{:d}context".format(num_features, min_word_count, context)
     model_name = join(model_dir, model_name)
-    if exists(model_name):
+    
+    if pre_trained_word2vec_model!=None:
+        embedding_model = pre_trained_word2vec_model
+    elif exists(model_name):
         embedding_model = word2vec.Word2Vec.load(model_name)
         print('Load existing Word2Vec model \'%s\'' % split(model_name)[-1])
     else:

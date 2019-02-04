@@ -22,6 +22,7 @@ Differences from original article:
 import numpy as np
 import data_helpers
 from w2v import train_word2vec
+from gensim.models import Word2Vec
 
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Flatten, Input, MaxPooling1D, Convolution1D, Embedding
@@ -36,11 +37,13 @@ np.random.seed(0)
 model_type = "CNN-non-static"  # CNN-rand|CNN-non-static|CNN-static
 
 # Data source
-data_source = "keras_data_set"  # keras_data_set|local_dir
+data_source = "local_dir"  # keras_data_set|local_dir
 
 # Model Hyperparameters
-embedding_dim = 50
-filter_sizes = (3, 8)
+#embedding_dim = 50
+embedding_dim = 300
+#filter_sizes = (3, 8)
+filter_sizes = (3, 4, 5)
 num_filters = 10
 dropout_prob = (0.5, 0.8)
 hidden_dims = 50
@@ -60,6 +63,8 @@ context = 10
 #
 # ---------------------- Parameters end -----------------------
 
+#pre_trained_word2vec_model = None
+pre_trained_word2vec_model = Word2Vec.load('models/eng_comments_min5_dot_consec.model') 
 
 def load_data(data_source):
     assert data_source in ["keras_data_set", "local_dir"], "Unknown data source"
@@ -74,7 +79,7 @@ def load_data(data_source):
         vocabulary_inv = dict((v, k) for k, v in vocabulary.items())
         vocabulary_inv[0] = "<PAD/>"
     else:
-        x, y, vocabulary, vocabulary_inv_list = data_helpers.load_data()
+        x, y, vocabulary, vocabulary_inv_list = data_helpers.load_data(word2vec_model = pre_trained_word2vec_model)
         vocabulary_inv = {key: value for key, value in enumerate(vocabulary_inv_list)}
         y = y.argmax(axis=1)
 
@@ -107,7 +112,7 @@ print("Vocabulary Size: {:d}".format(len(vocabulary_inv)))
 print("Model type is", model_type)
 if model_type in ["CNN-non-static", "CNN-static"]:
     embedding_weights = train_word2vec(np.vstack((x_train, x_test)), vocabulary_inv, num_features=embedding_dim,
-                                       min_word_count=min_word_count, context=context)
+                                       min_word_count=min_word_count, context=context, pre_trained_word2vec_model = pre_trained_word2vec_model)
     if model_type == "CNN-static":
         x_train = np.stack([np.stack([embedding_weights[word] for word in sentence]) for sentence in x_train])
         x_test = np.stack([np.stack([embedding_weights[word] for word in sentence]) for sentence in x_test])
@@ -131,7 +136,7 @@ model_input = Input(shape=input_shape)
 if model_type == "CNN-static":
     z = model_input
 else:
-    z = Embedding(len(vocabulary_inv), embedding_dim, input_length=sequence_length, name="embedding")(model_input)
+    z = Embedding(len(vocabulary_inv), embedding_dim, input_length=sequence_length, name="embedding", trainable=False)(model_input)
 
 z = Dropout(dropout_prob[0])(z)
 
@@ -165,3 +170,14 @@ if model_type == "CNN-non-static":
 # Train the model
 model.fit(x_train, y_train, batch_size=batch_size, epochs=num_epochs,
           validation_data=(x_test, y_test), verbose=2)
+
+# Save the weights
+model_weight_location = 'saved_models/model_weights.h5'
+model.save_weights(model_weight_location)
+print('saving the model weights at {}'.format(model_weight_location))
+
+# Save the model architecture
+model_arch_location = 'saved_models/model_architecture.json'
+with open(model_arch_location, 'w') as f:
+    f.write(model.to_json())
+print('saving the model architecture at {}'.format(model_arch_location))

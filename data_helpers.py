@@ -8,7 +8,7 @@ Original taken from https://github.com/dennybritz/cnn-text-classification-tf
 """
 
 
-def clean_str(string):
+def clean_str_old(string):
     """
     Tokenization/string cleaning for all datasets except for SST.
     Original taken from https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py
@@ -28,6 +28,29 @@ def clean_str(string):
     string = re.sub(r"\s{2,}", " ", string)
     return string.strip().lower()
 
+def clean_str(string):
+    """ 
+    Tokenization/string cleaning for all datasets except for SST.
+    Original taken from https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py
+    """
+    string = re.sub(r"[^A-Za-z0-9(),!?\'\`*$@#]", " ", string)
+    string = re.sub(r"\'s", " \'s", string)
+    string = re.sub(r"\'ve", " \'ve", string)
+    string = re.sub(r"n\'t", " n\'t", string)
+    string = re.sub(r"\'re", " \'re", string)
+   # string = re.sub(r"\'d", " \'d", string)
+    string = re.sub(r"\'ll", " \'ll", string)
+    string = re.sub(r",", " , ", string)
+   # string = re.sub(r"!", " ! ", string)
+    string = re.sub(r"\(", " \( ", string)
+    string = re.sub(r"\)", " \) ", string)
+   # string = re.sub(r"\?", " \? ", string)
+    string = re.sub(r"\s{2,}", " ", string)
+    string = string.lower()
+    #reducing multiple consecutive occurrences to two occurrences
+    #string = re.sub(r'([A-Za-z])\1{2,}',r'\1\1', string)
+    string = re.sub(r'(.)\1{2,}',r'\1\1', string)    
+    return string.strip().lower()
 
 def load_data_and_labels():
     """
@@ -35,9 +58,13 @@ def load_data_and_labels():
     Returns split sentences and labels.
     """
     # Load data from files
-    positive_examples = list(open("./data/rt-polarity.pos").readlines())
+    #positive_examples = list(open("./data/rt-polarity.pos").readlines())
+    #positive_examples = list(open("./data/rt-polarity.pos", "r", encoding='latin-1').readlines())
+    positive_examples = list(open("./data/rt-polarity_myt.pos", "r", encoding='utf-8').readlines())
     positive_examples = [s.strip() for s in positive_examples]
-    negative_examples = list(open("./data/rt-polarity.neg").readlines())
+    #negative_examples = list(open("./data/rt-polarity.neg").readlines())
+    #negative_examples = list(open("./data/rt-polarity.neg", "r", encoding='latin-1').readlines())
+    negative_examples = list(open("./data/rt-polarity_myt.neg", "r", encoding='utf-8').readlines())
     negative_examples = [s.strip() for s in negative_examples]
     # Split by words
     x_text = positive_examples + negative_examples
@@ -65,7 +92,7 @@ def pad_sentences(sentences, padding_word="<PAD/>"):
     return padded_sentences
 
 
-def build_vocab(sentences):
+def build_vocab_old(sentences):
     """
     Builds a vocabulary mapping from word to index based on the sentences.
     Returns vocabulary mapping and inverse vocabulary mapping.
@@ -74,6 +101,24 @@ def build_vocab(sentences):
     word_counts = Counter(itertools.chain(*sentences))
     # Mapping from index to word
     vocabulary_inv = [x[0] for x in word_counts.most_common()]
+    # Mapping from word to index
+    vocabulary = {x: i for i, x in enumerate(vocabulary_inv)}
+    return [vocabulary, vocabulary_inv]
+
+def build_vocab(sentences, word2vec_model=None):
+    """
+    Builds a vocabulary mapping from word to index based on the sentences.
+    Returns vocabulary mapping and inverse vocabulary mapping.
+    """
+    # Build vocabulary
+    word_counts = Counter(itertools.chain(*sentences))
+    # Mapping from index to word
+    vocabulary_inv = [x[0] for x in word_counts.most_common()]
+    
+    if word2vec_model!=None:
+        list_vocab = list(word2vec_model.wv.vocab)
+        vocabulary_inv = list(set(vocabulary_inv + list_vocab))
+
     # Mapping from word to index
     vocabulary = {x: i for i, x in enumerate(vocabulary_inv)}
     return [vocabulary, vocabulary_inv]
@@ -88,7 +133,7 @@ def build_input_data(sentences, labels, vocabulary):
     return [x, y]
 
 
-def load_data():
+def load_data(word2vec_model=None):
     """
     Loads and preprocessed data for the MR dataset.
     Returns input vectors, labels, vocabulary, and inverse vocabulary.
@@ -96,7 +141,7 @@ def load_data():
     # Load and preprocess data
     sentences, labels = load_data_and_labels()
     sentences_padded = pad_sentences(sentences)
-    vocabulary, vocabulary_inv = build_vocab(sentences_padded)
+    vocabulary, vocabulary_inv = build_vocab(sentences_padded, word2vec_model)
     x, y = build_input_data(sentences_padded, labels, vocabulary)
     return [x, y, vocabulary, vocabulary_inv]
 
